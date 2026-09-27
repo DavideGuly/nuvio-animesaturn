@@ -50,7 +50,7 @@ async function updateAnimeSaturnCatalog() {
     let rawTitle = $('.anime-card-title, .archive-title, .card-title, .main-anime-title, .anime-title').first().text().trim();
 
     if (!rawTitle) {
-      rawTitle = $('a[href*="/anime/"]').first().attr('title') \vert{}\vert{} $('a[href*="/anime/"]').first().text().trim();
+      rawTitle = $('a[href*="/anime/"]').first().attr('title') || $('a[href*="/anime/"]').first().text().trim();
     }
 
     if (!rawTitle) {
