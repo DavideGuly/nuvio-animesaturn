@@ -25,6 +25,7 @@ let cachedCatalog = [];
 
 function cleanTitle(title) {
   return title
+    .replace(/-/g, ' ')
     .replace(/\(ITA\)/gi, '')
     .replace(/SUB ITA/gi, '')
     .replace(/\(TV\)/gi, '')
@@ -47,19 +48,31 @@ async function updateAnimeSaturnCatalog() {
 
     const $ = cheerio.load(response.data);
 
-    let rawTitle = $('.anime-card-title, .archive-title, .card-title, .main-anime-title, .anime-title').first().text().trim();
+    let rawTitle = '';
 
-    if (!rawTitle) {
-      rawTitle = $('a[href*="/anime/"]').first().attr('title') || $('a[href*="/anime/"]').first().text().trim();
+    // 1. Cerca il primo link con percorso /anime/ ed estrae lo slug dell'URL
+    const firstAnimeLink = $('a[href*="/anime/"]').first().attr('href');
+
+    if (firstAnimeLink) {
+      // Estrae il nome dell'anime dall'URL (es. "https://www.animesaturn.net/anime/solo-leveling" -> "solo leveling")
+      const slug = firstAnimeLink.split('/anime/')[1];
+      if (slug) {
+        rawTitle = slug.split('?')[0].split('#')[0];
+      }
     }
 
+    // 2. Fallback se l'URL non è presente
     if (!rawTitle) {
-      console.warn('[AnimeSaturn] Titolo non trovato nella home page.');
+      rawTitle = $('.anime-card-title, .archive-title, .card-title, .main-anime-title').first().text().trim();
+    }
+
+    if (!rawTitle || rawTitle.toLowerCase() === 'dettagli') {
+      console.warn('[AnimeSaturn] Impossibile estrarre un titolo valido dalla home page.');
       return;
     }
 
     const searchQuery = cleanTitle(rawTitle);
-    console.log(`[AnimeSaturn] Ultimo anime trovato: "${rawTitle}" -> Cerco: "${searchQuery}"`);
+    console.log(`[AnimeSaturn] Ultimo anime trovato: "${rawTitle}" -> Cerco su AniList: "${searchQuery}"`);
 
     const aniListRes = await axios.post('https://graphql.anilist.co', {
       query: `
