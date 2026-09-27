@@ -6,8 +6,8 @@ const cron = require('node-cron');
 const ANIMESATURN_URL = 'https://www.animesaturn.net/';
 
 const builder = new addonBuilder({
-  id: 'org.animesaturn.nuviocatalog',
-  version: '1.2.0',
+  id: 'org.animesaturn.nuviocatalog.v2',
+  version: '2.0.0',
   name: 'AnimeSaturn Catalogo Nuvio',
   description: 'Mostra gli ultimi anime usciti su AnimeSaturn in ordine cronologico.',
   resources: ['catalog', 'meta'],
@@ -16,6 +16,11 @@ const builder = new addonBuilder({
     {
       type: 'anime',
       id: 'animesaturn_latest',
+      name: 'AnimeSaturn Ultimi Usciti'
+    },
+    {
+      type: 'series',
+      id: 'animesaturn_latest_series',
       name: 'AnimeSaturn Ultimi Usciti'
     }
   ]
@@ -39,7 +44,7 @@ function cleanTitle(title) {
 
 async function updateAnimeSaturnCatalog() {
   try {
-    console.log('[AnimeSaturn] Avvio scraping griglia "Ultime Uscite"...');
+    console.log('[AnimeSaturn] Avvio scraping...');
 
     const response = await axios.get(ANIMESATURN_URL, {
       headers: {
@@ -109,7 +114,7 @@ async function updateAnimeSaturnCatalog() {
           if (!newCatalog.some(item => item.id === metaId)) {
             const metaObject = {
               id: metaId,
-              type: 'series',
+              type: 'anime',
               name: media.title.romaji || media.title.english || titleQuery,
               poster: media.coverImage.extraLarge,
               background: media.bannerImage,
@@ -130,7 +135,7 @@ async function updateAnimeSaturnCatalog() {
     if (newCatalog.length > 0) {
       cachedCatalog = newCatalog;
       cachedMetaMap = newMetaMap;
-      console.log(`[AnimeSaturn] Catalogo aggiornato con successo (${cachedCatalog.length} anime estratti)`);
+      console.log(`[AnimeSaturn] Catalogo aggiornato (${cachedCatalog.length} anime estratti)`);
     }
   } catch (err) {
     console.error('[AnimeSaturn] Errore aggiornamento:', err.message);
@@ -138,13 +143,13 @@ async function updateAnimeSaturnCatalog() {
 }
 
 builder.defineCatalogHandler(({ type, id }) => {
-  if (type === 'anime' && id === 'animesaturn_latest') {
+  if (id === 'animesaturn_latest' || id === 'animesaturn_latest_series') {
     return Promise.resolve({ metas: cachedCatalog });
   }
   return Promise.resolve({ metas: [] });
 });
 
-builder.defineMetaHandler(({ type, id }) => {
+builder.defineMetaHandler(({ id }) => {
   if (cachedMetaMap.has(id)) {
     return Promise.resolve({ meta: cachedMetaMap.get(id) });
   }
