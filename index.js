@@ -52,13 +52,13 @@ async function updateAnimeSaturnCatalog() {
     const $ = cheerio.load(response.data);
     const animeTitles = [];
 
-    // Estrae i titoli direttamente dalle card presenti nella sezione "Ultime uscite"
     $('.main-anime-card, .anime-card, .ep-card, .card').each((i, el) => {
-      // Cerca prima nel testo del titolo card o dell'alt/title dell'immagine
       let title = $(el).find('.anime-title, .card-title, .title, a.anime-link').text().trim();
       
       if (!title) {
-        title = $(el).find('img').attr('alt') \vert{}\vert{}$(el).find('a').attr('title');
+        const imgAlt = $(el).find('img').attr('alt');
+        const linkTitle = $(el).find('a').attr('title');
+        title = imgAlt ? imgAlt : (linkTitle ? linkTitle : '');
       }
 
       if (title) {
@@ -69,7 +69,6 @@ async function updateAnimeSaturnCatalog() {
       }
     });
 
-    // Se i selettori di classe falliscono, estrae i link contenuti nel blocco principale
     if (animeTitles.length === 0) {
       $('a[href*="/anime/"]').each((i, el) => {
         const text = $(el).text().trim();
