@@ -6,18 +6,13 @@ const cron = require('node-cron');
 const ANIMESATURN_URL = 'https://www.animesaturn.net/';
 
 const builder = new addonBuilder({
-  id: 'org.animesaturn.nuviocatalog.v2',
-  version: '2.0.0',
+  id: 'org.animesaturn.nuviocatalog.v3',
+  version: '3.0.0',
   name: 'AnimeSaturn Catalogo Nuvio',
   description: 'Mostra gli ultimi anime usciti su AnimeSaturn in ordine cronologico.',
   resources: ['catalog', 'meta'],
-  types: ['anime', 'series'],
+  types: ['series', 'anime'],
   catalogs: [
-    {
-      type: 'anime',
-      id: 'animesaturn_latest',
-      name: 'AnimeSaturn Ultimi Usciti'
-    },
     {
       type: 'series',
       id: 'animesaturn_latest_series',
@@ -44,7 +39,7 @@ function cleanTitle(title) {
 
 async function updateAnimeSaturnCatalog() {
   try {
-    console.log('[AnimeSaturn] Avvio scraping...');
+    console.log('[AnimeSaturn] Avvio scraping griglia "Ultime Uscite"...');
 
     const response = await axios.get(ANIMESATURN_URL, {
       headers: {
@@ -84,7 +79,7 @@ async function updateAnimeSaturnCatalog() {
       });
     }
 
-    const topTitles = animeTitles.slice(0, 20);
+    const topTitles = animeTitles.slice(0, 25);
     const newCatalog = [];
     const newMetaMap = new Map();
 
@@ -114,7 +109,7 @@ async function updateAnimeSaturnCatalog() {
           if (!newCatalog.some(item => item.id === metaId)) {
             const metaObject = {
               id: metaId,
-              type: 'anime',
+              type: 'series',
               name: media.title.romaji || media.title.english || titleQuery,
               poster: media.coverImage.extraLarge,
               background: media.bannerImage,
@@ -143,7 +138,7 @@ async function updateAnimeSaturnCatalog() {
 }
 
 builder.defineCatalogHandler(({ type, id }) => {
-  if (id === 'animesaturn_latest' || id === 'animesaturn_latest_series') {
+  if (id === 'animesaturn_latest_series') {
     return Promise.resolve({ metas: cachedCatalog });
   }
   return Promise.resolve({ metas: [] });
