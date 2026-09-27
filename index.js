@@ -29,7 +29,7 @@ function cleanTitle(slug) {
   // Rimuove l'ID alfanumerico finale generato dal sito (es. -Qqj3j)
   let cleaned = slug.replace(/-[a-zA-Z0-9]+$/, '');
 
-  // Sostituisce i trattini con gli spazi e pulisce i tag inutili
+  // Sostituisce i trattini con gli spazi e pulisce le parole chiave
   cleaned = cleaned
     .replace(/-/g, ' ')
     .replace(/\bita\b/gi, '')
