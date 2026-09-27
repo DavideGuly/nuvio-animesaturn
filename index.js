@@ -23,15 +23,23 @@ const builder = new addonBuilder({
 
 let cachedCatalog = [];
 
-function cleanTitle(title) {
-  return title
+function cleanTitle(slug) {
+  if (!slug) return '';
+  
+  // Rimuove l'ID alfanumerico finale generato dal sito (es. -Qqj3j)
+  let cleaned = slug.replace(/-[a-zA-Z0-9]+$/, '');
+
+  // Sostituisce i trattini con gli spazi e pulisce i tag inutili
+  cleaned = cleaned
     .replace(/-/g, ' ')
-    .replace(/\(ITA\)/gi, '')
-    .replace(/SUB ITA/gi, '')
-    .replace(/\(TV\)/gi, '')
-    .replace(/Stagione \d+/gi, '')
-    .replace(/Season \d+/gi, '')
+    .replace(/\bita\b/gi, '')
+    .replace(/\bsub\b/gi, '')
+    .replace(/\btv\b/gi, '')
+    .replace(/stagione \d+/gi, '')
+    .replace(/season \d+/gi, '')
     .trim();
+
+  return cleaned;
 }
 
 async function updateAnimeSaturnCatalog() {
@@ -48,31 +56,25 @@ async function updateAnimeSaturnCatalog() {
 
     const $ = cheerio.load(response.data);
 
-    let rawTitle = '';
+    let rawSlug = '';
 
-    // 1. Cerca il primo link con percorso /anime/ ed estrae lo slug dell'URL
+    // Trova il primo link valido ad un anime
     const firstAnimeLink = $('a[href*="/anime/"]').first().attr('href');
 
     if (firstAnimeLink) {
-      // Estrae il nome dell'anime dall'URL (es. "https://www.animesaturn.net/anime/solo-leveling" -> "solo leveling")
-      const slug = firstAnimeLink.split('/anime/')[1];
-      if (slug) {
-        rawTitle = slug.split('?')[0].split('#')[0];
+      const parts = firstAnimeLink.split('/anime/')[1];
+      if (parts) {
+        rawSlug = parts.split('?')[0].split('#')[0];
       }
     }
 
-    // 2. Fallback se l'URL non è presente
-    if (!rawTitle) {
-      rawTitle = $('.anime-card-title, .archive-title, .card-title, .main-anime-title').first().text().trim();
-    }
-
-    if (!rawTitle || rawTitle.toLowerCase() === 'dettagli') {
-      console.warn('[AnimeSaturn] Impossibile estrarre un titolo valido dalla home page.');
+    if (!rawSlug) {
+      console.warn('[AnimeSaturn] Impossibile estrarre lo slug dell\'anime.');
       return;
     }
 
-    const searchQuery = cleanTitle(rawTitle);
-    console.log(`[AnimeSaturn] Ultimo anime trovato: "${rawTitle}" -> Cerco su AniList: "${searchQuery}"`);
+    const searchQuery = cleanTitle(rawSlug);
+    console.log(`[AnimeSaturn] Slug estratto: "${rawSlug}" -> Cerco su AniList: "${searchQuery}"`);
 
     const aniListRes = await axios.post('https://graphql.anilist.co', {
       query: `
