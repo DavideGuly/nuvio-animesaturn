@@ -3,10 +3,8 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const cron = require('node-cron');
 
-// Sito target per lo scraping
 const ANIMESATURN_URL = 'https://www.animesaturn.net/';
 
-// Definizione del Manifest dell'Addon per Nuvio
 const builder = new addonBuilder({
   id: 'org.animesaturn.nuviocatalog',
   version: '1.0.0',
@@ -23,10 +21,8 @@ const builder = new addonBuilder({
   ]
 });
 
-// Cache locale del catalogo
 let cachedCatalog = [];
 
-// Pulizia del titolo per migliorare la ricerca su AniList
 function cleanTitle(title) {
   return title
     .replace(/\(ITA\)/gi, '')
@@ -51,7 +47,6 @@ async function updateAnimeSaturnCatalog() {
 
     const $ = cheerio.load(response.data);
 
-    // Estrae il primo titolo dell'ultimo anime aggiornato
     let rawTitle = $('.anime-card-title, .archive-title, .card-title, .main-anime-title, .anime-title').first().text().trim();
 
     if (!rawTitle) {
@@ -66,7 +61,6 @@ async function updateAnimeSaturnCatalog() {
     const searchQuery = cleanTitle(rawTitle);
     console.log(`[AnimeSaturn] Ultimo anime trovato: "${rawTitle}" -> Cerco: "${searchQuery}"`);
 
-    // Interroga AniList per ottenere ID Kitsu/AniList, copertine e informazioni
     const aniListRes = await axios.post('https://graphql.anilist.co', {
       query: `
         query ($search: String) {
@@ -102,7 +96,6 @@ async function updateAnimeSaturnCatalog() {
   }
 }
 
-// Handler per la richiesta del catalogo
 builder.defineCatalogHandler(({ type, id }) => {
   if (type === 'anime' && id === 'animesaturn_latest') {
     return Promise.resolve({ metas: cachedCatalog });
@@ -110,12 +103,10 @@ builder.defineCatalogHandler(({ type, id }) => {
   return Promise.resolve({ metas: [] });
 });
 
-// Pianificazione Cron: Esegui ogni giorno alle ore 19:00
 cron.schedule('0 19 * * *', () => {
   updateAnimeSaturnCatalog();
 });
 
-// Porta dinamica per il Cloud (Render/Koyeb)
 const PORT = process.env.PORT || 7000;
 
 updateAnimeSaturnCatalog().then(() => {
