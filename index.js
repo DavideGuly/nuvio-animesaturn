@@ -9,7 +9,7 @@ const builder = new addonBuilder({
   id: 'org.animesaturn.nuviocatalog',
   version: '1.0.0',
   name: 'AnimeSaturn Catalogo Nuvio',
-  description: 'Aggiunge un catalogo con l\'ultimo anime pubblicato su AnimeSaturn.',
+  description: 'Mostra gli ultimi anime aggiornati su AnimeSaturn.',
   resources: ['catalog'],
   types: ['anime', 'series'],
   catalogs: [
@@ -25,12 +25,8 @@ let cachedCatalog = [];
 
 function cleanTitle(slug) {
   if (!slug) return '';
-  
-  // Rimuove l'ID alfanumerico finale generato dal sito (es. -Qqj3j)
   let cleaned = slug.replace(/-[a-zA-Z0-9]+$/, '');
-
-  // Sostituisce i trattini con gli spazi e pulisce le parole chiave
-  cleaned = cleaned
+  return cleaned
     .replace(/-/g, ' ')
     .replace(/\bita\b/gi, '')
     .replace(/\bsub\b/gi, '')
@@ -38,13 +34,11 @@ function cleanTitle(slug) {
     .replace(/stagione \d+/gi, '')
     .replace(/season \d+/gi, '')
     .trim();
-
-  return cleaned;
 }
 
 async function updateAnimeSaturnCatalog() {
   try {
-    console.log('[AnimeSaturn] Avvio recupero da animesaturn.net...');
+    console.log('[AnimeSaturn] Avvio recupero ultime uscite...');
 
     const response = await axios.get(ANIMESATURN_URL, {
       headers: {
@@ -55,56 +49,67 @@ async function updateAnimeSaturnCatalog() {
     });
 
     const $ = cheerio.load(response.data);
+    const animeLinks = [];
 
-    let rawSlug = '';
+    // Raccoglie i link degli anime dalla home page
+    $('a[href*="/anime/"]').each((i, el) => {
+      const href = $(el).attr('href');
+      if (href && href.includes('/anime/')) {
+        const parts = href.split('/anime/')[1];
+        if (parts) {
+          const slug = parts.split('?')[0].split('#')[0];
+          if (slug && !animeLinks.includes(slug)) {
+            animeLinks.push(slug);
+          }
+        }
+      }
+    });
 
-    // Trova il primo link valido ad un anime
-    const firstAnimeLink = $('a[href*="/anime/"]').first().attr('href');
+    // Seleziona fino a 35 titoli
+    const topSlugs = animeLinks.slice(0, 35);
+    const newCatalog = [];
 
-    if (firstAnimeLink) {
-      const parts = firstAnimeLink.split('/anime/')[1];
-      if (parts) {
-        rawSlug = parts.split('?')[0].split('#')[0];
+    for (const slug of topSlugs) {
+      const searchQuery = cleanTitle(slug);
+      if (!searchQuery) continue;
+
+      try {
+        const aniListRes = await axios.post('https://graphql.anilist.co', {
+          query: `
+            query ($search: String) {
+              Media (search: $search, type: ANIME) {
+                id
+                title { romaji english native }
+                coverImage { extraLarge }
+                bannerImage
+                description
+              }
+            }
+          `,
+          variables: { search: searchQuery }
+        }, { timeout: 4000 });
+
+        const media = aniListRes.data?.data?.Media;
+        if (media) {
+          if (!newCatalog.some(item => item.id === `kitsu:${media.id}`)) {
+            newCatalog.push({
+              id: `kitsu:${media.id}`,
+              type: 'series',
+              name: media.title.romaji || media.title.english || searchQuery,
+              poster: media.coverImage.extraLarge,
+              background: media.bannerImage,
+              description: media.description ? media.description.replace(/<[^>]*>?/gm, '') : ''
+            });
+          }
+        }
+      } catch (e) {
+        console.warn(`[AniList] Saltato: "${searchQuery}" (${e.message})`);
       }
     }
 
-    if (!rawSlug) {
-      console.warn('[AnimeSaturn] Impossibile estrarre lo slug dell\'anime.');
-      return;
-    }
-
-    const searchQuery = cleanTitle(rawSlug);
-    console.log(`[AnimeSaturn] Slug estratto: "${rawSlug}" -> Cerco su AniList: "${searchQuery}"`);
-
-    const aniListRes = await axios.post('https://graphql.anilist.co', {
-      query: `
-        query ($search: String) {
-          Media (search: $search, type: ANIME) {
-            id
-            title { romaji english native }
-            coverImage { extraLarge }
-            bannerImage
-            description
-          }
-        }
-      `,
-      variables: { search: searchQuery }
-    }, { timeout: 5000 });
-
-    const media = aniListRes.data.data.Media;
-
-    if (media) {
-      cachedCatalog = [{
-        id: `kitsu:${media.id}`,
-        type: 'series',
-        name: media.title.romaji || media.title.english || searchQuery,
-        poster: media.coverImage.extraLarge,
-        background: media.bannerImage,
-        description: media.description ? media.description.replace(/<[^>]*>?/gm, '') : ''
-      }];
-      console.log(`[AnimeSaturn] Catalogo aggiornato con successo: kitsu:${media.id}`);
-    } else {
-      console.warn('[AnimeSaturn] Nessun risultato trovato su AniList.');
+    if (newCatalog.length > 0) {
+      cachedCatalog = newCatalog;
+      console.log(`[AnimeSaturn] Catalogo aggiornato con successo (${cachedCatalog.length} anime trovati)`);
     }
   } catch (err) {
     console.error('[AnimeSaturn] Errore aggiornamento:', err.message);
